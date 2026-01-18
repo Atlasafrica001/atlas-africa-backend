@@ -1,0 +1,17 @@
+import { Router } from 'express';
+import adminController from '../../controllers/admin.controller';
+import { authenticate } from '../../middleware/auth.middleware';
+import { adminRateLimiter } from '../../middleware/rateLimit.middleware';
+
+const router = Router();
+
+// All admin routes require authentication
+router.use(authenticate);
+router.use(adminRateLimiter);
+
+router.get('/', adminController.getWaitlist);
+router.put('/:id/notify', adminController.notifyWaitlist);
+router.delete('/:id', adminController.deleteWaitlist);
+router.get('/export', adminController.exportWaitlist);
+
+export default router;

@@ -3,6 +3,7 @@ import { JwtPayload } from '../utils/jwt.util';
 
 // Extend Express Request to include admin from JWT
 export interface AuthRequest extends Request {
+  file: any;
   admin?: JwtPayload;
 }
 

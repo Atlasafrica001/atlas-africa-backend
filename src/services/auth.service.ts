@@ -1,53 +1,50 @@
-import { prisma } from '../config/database';
-import { comparePassword } from '../utils/password.util';
-import { generateToken } from '../utils/jwt.util';
-import { LoginCredentials } from '../types/request.types';
+import bcrypt from 'bcrypt';
+import { PrismaClient } from '@prisma/client';
+import { generateToken } from '../utils/jwt';
+import { AppError } from '../utils/errors';
+
+const prisma = new PrismaClient();
 
 export class AuthService {
-  async login(credentials: LoginCredentials) {
+  /**
+   * Authenticate admin and return JWT token
+   */
+  async login(email: string, password: string) {
+    // Find admin by email
     const admin = await prisma.admin.findUnique({
-      where: { email: credentials.email },
+      where: { email },
+      select: {
+        id: true,
+        email: true,
+        password: true,
+      }
     });
 
+    // Check if admin exists
     if (!admin) {
-      throw new Error('Invalid credentials');
+      throw new AppError('Invalid credentials', 401);
     }
 
-    const isValidPassword = await comparePassword(credentials.password, admin.password);
-
-    if (!isValidPassword) {
-      throw new Error('Invalid credentials');
+    // Verify password
+    const isPasswordValid = await bcrypt.compare(password, admin.password);
+    
+    if (!isPasswordValid) {
+      throw new AppError('Invalid credentials', 401);
     }
 
-    // Update last login
-    await prisma.admin.update({
-      where: { id: admin.id },
-      data: { lastLoginAt: new Date() },
-    });
-
+    // Generate JWT token
     const token = generateToken({
-      adminId: admin.id,
-      email: admin.email,
+      id: admin.id,
+      email: admin.email
     });
 
+    // Return token and admin info (without password)
     return {
       token,
       admin: {
         id: admin.id,
-        email: admin.email,
-        name: admin.name,
-      },
+        email: admin.email
+      }
     };
   }
-
-  async verifyAdmin(adminId: number) {
-    const admin = await prisma.admin.findUnique({
-      where: { id: adminId },
-      select: { id: true, email: true, name: true },
-    });
-
-    return admin;
-  }
 }
-
-export default new AuthService();

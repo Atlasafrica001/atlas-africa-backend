@@ -1,14 +1,23 @@
 import { z } from 'zod';
 
+/**
+ * Login request validation schema
+ */
 export const loginSchema = z.object({
-  email: z
-    .string({ required_error: 'Email is required' })
-    .email('Invalid email format')
-    .toLowerCase()
-    .trim(),
-  password: z
-    .string({ required_error: 'Password is required' })
-    .min(6, 'Password must be at least 6 characters'),
+  body: z.object({
+    email: z
+      .string({
+        required_error: 'Email is required'
+      })
+      .email('Invalid email format')
+      .toLowerCase()
+      .trim(),
+    password: z
+      .string({
+        required_error: 'Password is required'
+      })
+      .min(1, 'Password cannot be empty')
+  })
 });
 
 export type LoginInput = z.infer<typeof loginSchema>;

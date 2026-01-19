@@ -1,22 +1,9 @@
 import express, { Application } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
-import dotenv from 'dotenv';
-import { errorHandler, notFoundHandler } from './middleware/error.middleware';
-
-// Import routes
-import waitlistRoutes from './routes/public/waitlist.routes';
-import consultationRoutes from './routes/public/consultation.routes';
-import blogRoutes from './routes/public/blog.routes';
-import authRoutes from './routes/public/auth.routes';
-
-import adminWaitlistRoutes from './routes/admin/waitlist.routes';
-import adminConsultationRoutes from './routes/admin/consultation.routes';
-import adminBlogRoutes from './routes/admin/blog.routes';
-import adminStatsRoutes from './routes/admin/stats.routes';
-import adminUploadRoutes from './routes/admin/upload.routes';
-
-dotenv.config();
+import morgan from 'morgan';
+import authRoutes from './routes/auth.routes';
+import { errorHandler } from './middleware/error.middleware';
 
 const app: Application = express();
 
@@ -24,47 +11,37 @@ const app: Application = express();
 app.use(helmet());
 
 // CORS configuration
-app.use(
-  cors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-  })
-);
+app.use(cors({
+  origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
+  credentials: true
+}));
 
 // Body parsing middleware
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-app.get('/', (_req, res) => {
-  res.json({
-    success: true,
-    message: 'Atlas Africa API is running 🚀'
+// Logging middleware
+if (process.env.NODE_ENV === 'development') {
+  app.use(morgan('dev'));
+}
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'OK', timestamp: new Date().toISOString() });
+});
+
+// API Routes
+app.use('/api/v1/auth', authRoutes);
+
+// 404 handler
+app.use('*', (req, res) => {
+  res.status(404).json({
+    success: false,
+    error: 'Route not found'
   });
 });
 
-
-// Health check endpoint
-app.get('/health', (_req, res) => {
-  res.json({ success: true, message: 'Server is running' });
-});
-
-// Public API routes
-app.use('/api/v1/waitlist', waitlistRoutes);
-app.use('/api/v1/consultations', consultationRoutes);
-app.use('/api/v1/blog', blogRoutes);
-app.use('/api/v1/auth', authRoutes);
-
-// Admin API routes (protected)
-app.use('/api/v1/admin/waitlist', adminWaitlistRoutes);
-app.use('/api/v1/admin/consultations', adminConsultationRoutes);
-app.use('/api/v1/admin/blog', adminBlogRoutes);
-app.use('/api/v1/admin/stats', adminStatsRoutes);
-app.use('/api/v1/admin/upload', adminUploadRoutes);
-
-// Error handlers (must be last)
-app.use(notFoundHandler);
+// Global error handler (must be last)
 app.use(errorHandler);
 
 export default app;

@@ -1,43 +1,31 @@
-import { Request, Response } from 'express';
-import { AuthRequest } from '../types/request.types';
-import { sendSuccess, sendError } from '../utils/response.util';
-import authService from '../services/auth.service';
+import { Request, Response, NextFunction } from 'express';
+import { AuthService } from '../services/auth.service';
+import { AppError } from '../utils/errors';
 
 export class AuthController {
-  async login(req: Request, res: Response): Promise<void> {
-    try {
-      const result = await authService.login(req.body);
-      sendSuccess(res, result, 'Login successful');
-    } catch (error: any) {
-      console.error('Login error:', error);
-      if (error.message === 'Invalid credentials') {
-        sendError(res, 'INVALID_CREDENTIALS', 'Invalid email or password', 401);
-      } else {
-        sendError(res, 'INTERNAL_SERVER_ERROR', 'Login failed', 500);
-      }
-    }
+  private authService: AuthService;
+
+  constructor() {
+    this.authService = new AuthService();
   }
 
-  async verify(req: AuthRequest, res: Response): Promise<void> {
+  /**
+   * Admin login
+   * @route POST /api/v1/auth/login
+   */
+  login = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      if (!req.admin) {
-        sendError(res, 'UNAUTHORIZED', 'Not authenticated', 401);
-        return;
-      }
+      const { email, password } = req.body;
 
-      const admin = await authService.verifyAdmin(req.admin.adminId);
+      // Validate credentials and generate token
+      const result = await this.authService.login(email, password);
 
-      if (!admin) {
-        sendError(res, 'INVALID_TOKEN', 'Admin not found', 401);
-        return;
-      }
-
-      sendSuccess(res, { valid: true, admin });
-    } catch (error: any) {
-      console.error('Verify error:', error);
-      sendError(res, 'INTERNAL_SERVER_ERROR', 'Verification failed', 500);
+      res.status(200).json({
+        success: true,
+        data: result
+      });
+    } catch (error) {
+      next(error);
     }
-  }
+  };
 }
-
-export default new AuthController();

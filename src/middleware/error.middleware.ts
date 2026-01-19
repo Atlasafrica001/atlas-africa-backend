@@ -1,65 +1,64 @@
 import { Request, Response, NextFunction } from 'express';
-import { sendError } from '../utils/response.util';
+import { AppError } from '../utils/errors';
+import { Prisma } from '@prisma/client';
 
 /**
- * Global error handler middleware
- * Catches all unhandled errors and sends structured error response
+ * Global error handling middleware
  */
 export const errorHandler = (
-  error: Error,
-  _req: Request,
+  err: Error,
+  req: Request,
   res: Response,
-  _next: NextFunction
-): void => {
-  console.error('Error:', error);
+  next: NextFunction
+) => {
+  // Default error
+  let statusCode = 500;
+  let message = 'Internal server error';
+  let details: any = undefined;
 
+  // Handle custom AppError
+  if (err instanceof AppError) {
+    statusCode = err.statusCode;
+    message = err.message;
+  }
+  
   // Handle Prisma errors
-  if (error.name === 'PrismaClientKnownRequestError') {
-    const prismaError = error as any;
-
-    // Unique constraint violation
-    if (prismaError.code === 'P2002') {
-      const field = prismaError.meta?.target?.[0] || 'field';
-      sendError(
-        res,
-        'DUPLICATE_ENTRY',
-        `${field} already exists`,
-        409
-      );
-      return;
-    }
-
-    // Record not found
-    if (prismaError.code === 'P2025') {
-      sendError(res, 'NOT_FOUND', 'Resource not found', 404);
-      return;
+  else if (err instanceof Prisma.PrismaClientKnownRequestError) {
+    statusCode = 400;
+    
+    switch (err.code) {
+      case 'P2002':
+        message = 'A record with this value already exists';
+        details = { field: err.meta?.target };
+        break;
+      case 'P2025':
+        message = 'Record not found';
+        break;
+      default:
+        message = 'Database operation failed';
     }
   }
-
-  // Handle JWT errors
-  if (error.name === 'JsonWebTokenError') {
-    sendError(res, 'INVALID_TOKEN', 'Invalid token', 401);
-    return;
+  
+  // Handle Prisma validation errors
+  else if (err instanceof Prisma.PrismaClientValidationError) {
+    statusCode = 400;
+    message = 'Invalid data provided';
   }
 
-  if (error.name === 'TokenExpiredError') {
-    sendError(res, 'INVALID_TOKEN', 'Token expired', 401);
-    return;
+  // Log error in development
+  if (process.env.NODE_ENV === 'development') {
+    console.error('Error:', {
+      message: err.message,
+      stack: err.stack,
+      statusCode
+    });
   }
 
-  // Default error response
-  sendError(
-    res,
-    'INTERNAL_SERVER_ERROR',
-    'An unexpected error occurred',
-    500
-  );
-};
-
-/**
- * 404 Not Found handler
- * Should be registered after all routes
- */
-export const notFoundHandler = (req: Request, res: Response): void => {
-  sendError(res, 'NOT_FOUND', `Route ${req.originalUrl} not found`, 404);
+  // Send error response
+  res.status(statusCode).json({
+    success: false,
+    error: message,
+    ...(details && { details }),
+    ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
+  });
 };

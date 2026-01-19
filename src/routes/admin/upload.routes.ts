@@ -10,9 +10,9 @@ const router = Router();
 // Configure multer for memory storage
 const storage = multer.memoryStorage();
 
-const fileFilter = (_req: any, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
+const fileFilter = (_req: any, file: multer.File, cb: multer.FileFilterCallback) => {
   const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
-  
+
   if (allowedTypes.includes(file.mimetype)) {
     cb(null, true);
   } else {
@@ -29,22 +29,21 @@ const upload = multer({
 });
 
 // All admin routes require authentication
-router.use(authenticate);
+router.use(authenticate as any);
 router.use(uploadRateLimiter);
 
 router.post(
   '/',
   upload.single('file'),
-  (req, res, next): void => {
+  (req: any, res, next): void => {
     if (!req.file) {
       sendError(res, 'NO_FILE', 'No file uploaded', 400);
       return;
     }
-    return next();
+    next();
   },
-  adminController.uploadImage
+  adminController.uploadImage as any
 );
-
 
 // Error handling for multer
 router.use((error: any, _req: any, res: any, next: any): void => {

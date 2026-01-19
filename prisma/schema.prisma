@@ -1,6 +1,4 @@
-// Atlas Africa Backend - Database Schema
-// This schema matches the frontend data structures exactly
-// DO NOT modify field names without updating frontend
+// This is your Prisma schema file
 
 generator client {
   provider = "prisma-client-js"
@@ -11,13 +9,10 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ============================================================================
-// ADMIN MODEL
-// ============================================================================
 model Admin {
-  id          Int       @id @default(autoincrement())
-  email       String    @unique
-  password    String
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  password  String
   name        String
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -27,9 +22,6 @@ model Admin {
   @@index([email])
 }
 
-// ============================================================================
-// WAITLIST ENTRY MODEL
-// ============================================================================
 model WaitlistEntry {
   id        Int      @id @default(autoincrement())
   name      String   @default("")
@@ -44,43 +36,11 @@ model WaitlistEntry {
   @@index([createdAt])
 }
 
-// ============================================================================
-// CONSULTATION REQUEST MODEL
-// ============================================================================
-model ConsultationRequest {
-  id             Int                @id @default(autoincrement())
-  fullName       String
-  email          String
-  company        String
-  phone          String
-  projectDetails String             @db.Text
-  status         ConsultationStatus @default(PENDING)
-  createdAt      DateTime           @default(now()) @map("date")
-  updatedAt      DateTime           @updatedAt
-  adminNotes     String?            @db.Text
-
-  @@map("consultation_requests")
-  @@index([email])
-  @@index([status])
-  @@index([createdAt])
-}
-
-enum ConsultationStatus {
-  PENDING
-  CONTACTED
-  CONVERTED
-
-  @@map("consultation_status")
-}
-
-// ============================================================================
-// BLOG POST MODEL
-// ============================================================================
 model BlogPost {
-  id          Int            @id @default(autoincrement())
+  id          Int      @id @default(autoincrement())
   title       String
-  slug        String         @unique
-  excerpt     String         @db.Text
+  slug        String   @unique
+ excerpt     String         @db.Text
   content     String         @db.Text
   coverImage  String?
   author      String
@@ -107,4 +67,30 @@ enum BlogPostStatus {
   PUBLISHED
 
   @@map("blog_post_status")
+}
+
+model ConsultationRequest {
+  id             Int                @id @default(autoincrement())
+  fullName       String
+  email          String
+  company        String
+  phone          String
+  projectDetails String             @db.Text
+  status         ConsultationStatus @default(PENDING)
+  createdAt      DateTime           @default(now()) @map("date")
+  updatedAt      DateTime           @updatedAt
+  adminNotes     String?            @db.Text
+
+  @@map("consultation_requests")
+  @@index([email])
+  @@index([status])
+  @@index([createdAt])
+}
+
+enum ConsultationStatus {
+  PENDING
+  CONTACTED
+  CONVERTED
+
+  @@map("consultation_status")
 }

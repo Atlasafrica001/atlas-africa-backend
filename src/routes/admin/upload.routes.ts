@@ -10,7 +10,7 @@ const router = Router();
 // Configure multer for memory storage
 const storage = multer.memoryStorage();
 
-const fileFilter = (_req: any, file: multer.File, cb: multer.FileFilterCallback) => {
+const fileFilter = (_req: any, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
   const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
 
   if (allowedTypes.includes(file.mimetype)) {

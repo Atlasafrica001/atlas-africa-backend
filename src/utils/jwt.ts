@@ -1,4 +1,4 @@
-import jwt from 'jsonwebtoken';
+import jwt, { SignOptions } from 'jsonwebtoken';
 import { AppError } from './errors';
 
 interface JWTPayload {
@@ -18,10 +18,17 @@ export const generateToken = (payload: JWTPayload): string => {
 
   const expiresIn = process.env.JWT_EXPIRES_IN || '7d';
 
-  return jwt.sign(payload, secret, {
-    expiresIn,
-    issuer: 'atlas-africa-api'
-  });
+  const options: SignOptions = {
+    expiresIn: typeof expiresIn === 'string' && /^\d+$/.test(expiresIn)
+      ? parseInt(expiresIn, 10)
+      : expiresIn as SignOptions['expiresIn'],
+    issuer: 'atlas-africa-api',
+  };
+
+  return jwt.sign(payload, secret, options);
+
+
+
 };
 
 /**

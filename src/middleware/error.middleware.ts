@@ -7,9 +7,9 @@ import { Prisma } from '@prisma/client';
  */
 export const errorHandler = (
   err: Error,
-  req: Request,
+  _req: Request,
   res: Response,
-  next: NextFunction
+  _next: NextFunction
 ) => {
   // Default error
   let statusCode = 500;

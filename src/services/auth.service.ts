@@ -1,9 +1,7 @@
 import bcrypt from 'bcrypt';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';  // ← Changed from new PrismaClient()
 import { generateToken } from '../utils/jwt';
 import { AppError } from '../utils/errors';
-
-const prisma = new PrismaClient();
 
 export class AuthService {
   /**

@@ -23,6 +23,9 @@ export class AuthController {
         success: true,
         data: result
       });
+
+      console.log('LOGIN BODY:', req.body);
+
     } catch (error) {
       next(error);
     }

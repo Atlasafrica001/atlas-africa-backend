@@ -14,7 +14,12 @@
     "seed": "tsx prisma/seed.ts",
     "lint": "tsc --noEmit"
   },
-  "keywords": ["express", "typescript", "prisma", "api"],
+  "keywords": [
+    "express",
+    "typescript",
+    "prisma",
+    "api"
+  ],
   "author": "Atlas Africa",
   "license": "MIT",
   "dependencies": {
@@ -43,7 +48,7 @@
   },
   "devDependencies": {
     "prisma": "^5.22.0",
-    "tsx": "^4.7.0"
+    "tsx": "^4.21.0"
   },
   "engines": {
     "node": ">=20.0.0",

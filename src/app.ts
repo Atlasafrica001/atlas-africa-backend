@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import authRoutes from './routes/auth.routes';
 import { errorHandler } from './middleware/error.middleware';
+import { prisma } from './lib/prisma';
 
 const app: Application = express();
 
@@ -65,6 +66,15 @@ app.get('/health', async (req, res) => {
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV
   });
+});
+
+app.get('/debug/database', async (req, res) => {
+  try {
+    const adminCount = await prisma.admin.count();
+    res.json({ success: true, adminCount });
+  } catch (error: any) {
+    res.json({ success: false, error: error.message, code: error.code });
+  }
 });
 
 // API Routes

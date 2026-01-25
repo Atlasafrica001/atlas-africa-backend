@@ -7,19 +7,16 @@
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
+    "start:setup": "node scripts/setup-database.js && node dist/server.js",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:migrate:deploy": "prisma migrate deploy",
     "prisma:studio": "prisma studio",
     "seed": "tsx prisma/seed.ts",
+    "setup": "npx prisma generate && npx prisma migrate deploy && npm run seed",
     "lint": "tsc --noEmit"
   },
-  "keywords": [
-    "express",
-    "typescript",
-    "prisma",
-    "api"
-  ],
+  "keywords": ["express", "typescript", "prisma", "api"],
   "author": "Atlas Africa",
   "license": "MIT",
   "dependencies": {
@@ -48,7 +45,7 @@
   },
   "devDependencies": {
     "prisma": "^5.22.0",
-    "tsx": "^4.21.0"
+    "tsx": "^4.7.0"
   },
   "engines": {
     "node": ">=20.0.0",

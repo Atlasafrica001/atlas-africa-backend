@@ -3,34 +3,54 @@ import { AuthController } from '../controllers/auth.controller';
 import { validateRequest } from '../middleware/validation.middleware';
 import { loginSchema } from '../validators/auth.validator';
 import { loginLimiter } from '../middleware/rateLimiter.middleware';
+import { authMiddleware } from '../middleware/auth.middleware';
 
 const router = Router();
 const authController = new AuthController();
 
 /**
  * @route   POST /api/v1/auth/login
- * @desc    Authenticate admin and get token
- * @access  Public (but rate limited)
+ * @desc    Authenticate admin and set httpOnly cookie
+ * @access  Public (rate limited)
  */
 router.post(
   '/login',
-  loginLimiter,                    // ← Rate limit (5 attempts per 15 min)
-  validateRequest(loginSchema),     // ← Validate request body
-  authController.login              // ← Handle login
+  loginLimiter,
+  validateRequest(loginSchema),
+  authController.login
 );
 
 /**
  * @route   POST /api/v1/auth/logout
- * @desc    Logout admin (invalidate token)
+ * @desc    Clear authentication cookie
  * @access  Private
  */
-// router.post('/logout', authMiddleware, authController.logout);
+router.post(
+  '/logout',
+  authMiddleware,
+  authController.logout
+);
 
 /**
  * @route   GET /api/v1/auth/me
- * @desc    Get current admin info
+ * @desc    Get current authenticated admin
  * @access  Private
  */
-// router.get('/me', authMiddleware, authController.getCurrentAdmin);
+router.get(
+  '/me',
+  authMiddleware,
+  authController.getCurrentAdmin
+);
+
+/**
+ * @route   POST /api/v1/auth/refresh
+ * @desc    Refresh authentication token
+ * @access  Private
+ */
+router.post(
+  '/refresh',
+  authMiddleware,
+  authController.refreshToken
+);
 
 export default router;

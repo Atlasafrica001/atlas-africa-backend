@@ -1,54 +1,94 @@
-import { Response, NextFunction } from 'express';
-import { AuthRequest } from '../types/request.types';
-import { verifyToken } from '../utils/jwt.util';
-import { sendError } from '../utils/response.util';
-import { prisma } from '../config/database';
+import { Request, Response, NextFunction } from 'express';
+import { verifyToken, JWTPayload } from '../utils/jwt';
+import { AppError } from '../utils/errors';
+import { prisma } from '../lib/prisma';
 
 /**
- * JWT Authentication Middleware
- * Verifies JWT token and attaches admin to request
+ * Authentication Middleware
+ * Verifies JWT token from httpOnly cookie
  */
-export const authenticate = async (
-  req: AuthRequest,
+export const authMiddleware = async (
+  req: Request,
   res: Response,
   next: NextFunction
-): Promise<void> => {
+) => {
   try {
-    // Extract token from Authorization header
-    const authHeader = req.headers.authorization;
+    // Get token from cookie (not from Authorization header anymore)
+    const token = req.cookies.authToken;
 
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      sendError(res, 'UNAUTHORIZED', 'No token provided', 401);
-      return;
+    if (!token) {
+      throw new AppError('Authentication required. Please login.', 401);
     }
-
-    const token = authHeader.substring(7); // Remove 'Bearer ' prefix
 
     // Verify token
-    const decoded = verifyToken(token);
-
-    if (!decoded) {
-      sendError(res, 'INVALID_TOKEN', 'Invalid or expired token', 401);
-      return;
+    let decoded: JWTPayload;
+    try {
+      decoded = verifyToken(token);
+    } catch (error) {
+      // Token invalid or expired
+      res.clearCookie('authToken'); // Clear invalid cookie
+      throw new AppError('Invalid or expired token. Please login again.', 401);
     }
 
-    // Verify admin exists in database
+    // Get admin from database
     const admin = await prisma.admin.findUnique({
-      where: { id: decoded.adminId },
-      select: { id: true, email: true, name: true },
+      where: { id: decoded.id },
+      select: {
+        id: true,
+        email: true,
+        createdAt: true,
+        updatedAt: true,
+      }
     });
 
     if (!admin) {
-      sendError(res, 'INVALID_TOKEN', 'Admin not found', 401);
-      return;
+      res.clearCookie('authToken');
+      throw new AppError('Admin account not found.', 401);
     }
 
-    // Attach admin to request
-    req.admin = decoded;
+    // Attach admin to request object
+    (req as any).admin = admin;
+    (req as any).tokenPayload = decoded;
 
     next();
   } catch (error) {
-    console.error('Authentication error:', error);
-    sendError(res, 'UNAUTHORIZED', 'Authentication failed', 401);
+    next(error);
+  }
+};
+
+/**
+ * Optional Auth Middleware
+ * Doesn't fail if no token, just doesn't set req.admin
+ * Useful for endpoints that work with or without auth
+ */
+export const optionalAuthMiddleware = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const token = req.cookies.authToken;
+
+    if (token) {
+      try {
+        const decoded = verifyToken(token);
+        const admin = await prisma.admin.findUnique({
+          where: { id: decoded.id },
+          select: { id: true, email: true, createdAt: true, updatedAt: true }
+        });
+
+        if (admin) {
+          (req as any).admin = admin;
+          (req as any).tokenPayload = decoded;
+        }
+      } catch (error) {
+        // Invalid token, but don't fail - just continue without auth
+        console.warn('Optional auth failed:', error);
+      }
+    }
+
+    next();
+  } catch (error) {
+    next(error);
   }
 };

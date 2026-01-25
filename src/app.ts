@@ -2,16 +2,17 @@ import express, { Application } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
+import cookieParser from 'cookie-parser';
 import { prisma } from './lib/prisma';
 import authRoutes from './routes/auth.routes';
 import { errorHandler, notFoundHandler } from './middleware/error.middleware';
 import { requestIdMiddleware } from './middleware/requestId.middleware';
-import { apiLimiter, setupLimiter } from './middleware/rateLimiter.middleware';
+import { apiLimiter } from './middleware/rateLimiter.middleware';
 
 const app: Application = express();
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// 1. TRUST PROXY (Required for Render/Heroku)
+// 1. TRUST PROXY
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 app.set('trust proxy', 1);
 
@@ -24,13 +25,29 @@ app.use(requestIdMiddleware);
 // 3. SECURITY HEADERS
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 app.use(helmet({
-  contentSecurityPolicy: false, // Disable for API
-  crossOriginEmbedderPolicy: false,
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", 'data:', 'https:'],
+      connectSrc: ["'self'"],
+      fontSrc: ["'self'"],
+      objectSrc: ["'none'"],
+      mediaSrc: ["'self'"],
+      frameSrc: ["'none'"],
+    },
+  },
   hsts: {
     maxAge: 31536000,
     includeSubDomains: true,
     preload: true
-  }
+  },
+  frameguard: {
+    action: 'deny'
+  },
+  noSniff: true,
+  xssFilter: true,
 }));
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -47,7 +64,6 @@ console.log('✅ Allowed CORS origins:', allowedOrigins);
 
 app.use(cors({
   origin: function (origin, callback) {
-    // Allow requests with no origin (mobile apps, curl, Postman)
     if (!origin) return callback(null, true);
     
     if (allowedOrigins.includes(origin)) {
@@ -57,21 +73,26 @@ app.use(cors({
       callback(new Error('Not allowed by CORS'));
     }
   },
-  credentials: true,
+  credentials: true, // CRITICAL: Required for cookies
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID'],
   exposedHeaders: ['X-Request-ID'],
-  maxAge: 86400 // 24 hours
+  maxAge: 86400
 }));
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// 5. BODY PARSING
+// 5. COOKIE PARSER (Required for httpOnly cookies)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+app.use(cookieParser());
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 6. BODY PARSING
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// 6. LOGGING
+// 7. LOGGING
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 if (process.env.NODE_ENV === 'development') {
   app.use(morgan('dev'));
@@ -80,103 +101,44 @@ if (process.env.NODE_ENV === 'development') {
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// 7. GENERAL API RATE LIMITING
+// 8. HTTPS ENFORCEMENT (Production only)
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-app.use('/api/', apiLimiter);
-
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// 8. HEALTH CHECK
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-app.get('/health', async (req, res) => {
-  try {
-    // Test database connection
-    await prisma.$queryRaw`SELECT 1`;
-    
-    res.status(200).json({ 
-      status: 'healthy', 
-      timestamp: new Date().toISOString(),
-      database: 'connected',
-      environment: process.env.NODE_ENV
-    });
-  } catch (error) {
-    console.error('❌ Health check failed:', error);
-    res.status(503).json({
-      status: 'unhealthy',
-      timestamp: new Date().toISOString(),
-      database: 'disconnected',
-      environment: process.env.NODE_ENV
-    });
-  }
-});
-
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// 9. DIAGNOSTIC ENDPOINTS (REMOVE IN PRODUCTION)
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-// TODO: Remove these before production launch
-if (process.env.NODE_ENV !== 'production') {
-  app.get('/debug/database', async (req, res) => {
-    try {
-      await prisma.$queryRaw`SELECT 1`;
-      const adminCount = await prisma.admin.count();
-      const admins = await prisma.admin.findMany({
-        select: { id: true, email: true, createdAt: true }
-      });
-      
-      res.json({
-        success: true,
-        database: 'connected',
-        adminCount,
-        admins
-      });
-    } catch (error: any) {
-      res.status(500).json({
-        success: false,
-        error: error.message,
-        code: error.code
-      });
+if (process.env.NODE_ENV === 'production') {
+  app.use((req, res, next) => {
+    if (req.header('x-forwarded-proto') !== 'https') {
+      return res.redirect(`https://${req.header('host')}${req.url}`);
     }
+    next();
   });
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// 10. SETUP ENDPOINTS (Rate Limited)
+// 9. RATE LIMITING
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-import bcrypt from 'bcrypt';
+app.use('/api/', apiLimiter);
 
-app.post('/setup/initialize', setupLimiter, async (req, res) => {
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 10. HEALTH CHECK
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+app.get('/health', async (req, res) => {
   try {
-    const existingAdmin = await prisma.admin.findUnique({
-      where: { email: 'admin@atlasafrica.com' }
-    }).catch(() => null);
-    
-    if (existingAdmin) {
-      return res.json({
-        success: true,
-        message: 'Admin already exists',
-        admin: { email: existingAdmin.email }
-      });
-    }
-    
-    const hashedPassword = await bcrypt.hash('admin123', 12);
-    const admin = await prisma.admin.create({
-      data: {
-        name: "atlas-admin",
-        email: 'admin@atlasafrica.com',
-        password: hashedPassword
+    await prisma.$queryRaw`SELECT 1`;
+    res.status(200).json({ 
+      status: 'healthy', 
+      timestamp: new Date().toISOString(),
+      database: 'connected',
+      environment: process.env.NODE_ENV,
+      security: {
+        https: process.env.NODE_ENV === 'production',
+        cookies: 'httpOnly',
+        cors: 'enabled'
       }
     });
-    
-    res.json({
-      success: true,
-      message: 'Database initialized successfully',
-      admin: { id: admin.id, email: admin.email }
-    });
-  } catch (error: any) {
-    res.status(500).json({
-      success: false,
-      error: error.message,
-      code: error.code
+  } catch (error) {
+    res.status(503).json({
+      status: 'unhealthy',
+      timestamp: new Date().toISOString(),
+      database: 'disconnected'
     });
   }
 });
@@ -185,9 +147,6 @@ app.post('/setup/initialize', setupLimiter, async (req, res) => {
 // 11. API ROUTES
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 app.use('/api/v1/auth', authRoutes);
-// app.use('/api/v1/waitlist', waitlistRoutes);
-// app.use('/api/v1/blog', blogRoutes);
-// app.use('/api/v1/consultations', consultationRoutes);
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // 12. 404 HANDLER

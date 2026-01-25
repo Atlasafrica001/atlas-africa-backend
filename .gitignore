@@ -35,7 +35,6 @@ coverage/
 .nyc_output/
 
 # Prisma
-prisma/migrations/*
 !prisma/migrations/.gitkeep
 
 # Uploads (if storing locally - not used with Cloudinary)

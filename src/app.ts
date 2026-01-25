@@ -133,7 +133,7 @@ app.post('/setup/initialize', async (req, res) => {
     const hashedPassword = await bcrypt.hash('admin123', 12);
     const admin = await prisma.admin.create({
       data: {
-        name: 'Admin',
+        name: 'atlas-admin',
         email: 'admin@atlasafrica.com',
         password: hashedPassword
       }

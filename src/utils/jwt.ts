@@ -1,7 +1,7 @@
 import jwt, { SignOptions } from 'jsonwebtoken';
 import { AppError } from './errors';
 
-interface JWTPayload {
+export interface JWTPayload {
   id: number;
   email: string;
 }

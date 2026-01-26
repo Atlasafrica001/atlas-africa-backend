@@ -92,3 +92,5 @@ export const optionalAuthMiddleware = async (
     next(error);
   }
 };
+
+export const authenticate = authMiddleware;

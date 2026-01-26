@@ -1,13 +1,15 @@
 import { Request, Response } from 'express';
 import { AuthService } from '../services/auth.service';
-import { AppError } from '../utils/errors';
 import { asyncHandler } from '../utils/asyncHandler';
 
 const authService = new AuthService();
 
 export class AuthController {
+  refreshToken(arg0: string, authMiddleware: (req: Request<import("express-serve-static-core").ParamsDictionary, any, any, import("qs").ParsedQs, Record<string, any>>, res: Response<any, Record<string, any>>, next: import("express").NextFunction) => Promise<void>, refreshToken: any) {
+    throw new Error('Method not implemented.');
+  }
   /**
-   * Login - Set JWT in httpOnly cookie
+   * Login - Return JWT in response body (Phase 2 compatible)
    */
   login = asyncHandler(async (req: Request, res: Response) => {
     const { email, password } = req.body;
@@ -15,37 +17,20 @@ export class AuthController {
     // Authenticate user
     const { token, admin } = await authService.login(email, password);
 
-    // Set cookie with secure options
-    res.cookie('authToken', token, {
-      httpOnly: true,           // Cannot be accessed by JavaScript
-      secure: process.env.NODE_ENV === 'production', // HTTPS only in production
-      sameSite: 'strict',       // CSRF protection
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-      path: '/',
-      domain: process.env.COOKIE_DOMAIN, // Optional: .yourdomain.com for subdomains
-    });
-
-    // Return admin info (without token in body for extra security)
+    // Return token in response body (Phase 2 - localStorage)
     res.status(200).json({
       success: true,
       data: {
-        admin,
-        message: 'Login successful'
+        token,
+        admin
       }
     });
   });
 
   /**
-   * Logout - Clear the cookie
+   * Logout - Just returns success (token removed on frontend)
    */
   logout = asyncHandler(async (req: Request, res: Response) => {
-    res.clearCookie('authToken', {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      path: '/',
-    });
-
     res.status(200).json({
       success: true,
       data: {
@@ -63,36 +48,6 @@ export class AuthController {
     res.status(200).json({
       success: true,
       data: { admin }
-    });
-  });
-
-  /**
-   * Refresh Token
-   */
-  refreshToken = asyncHandler(async (req: Request, res: Response) => {
-    const admin = (req as any).admin; // From auth middleware
-
-    // Generate new token
-    const { generateToken } = require('../utils/jwt');
-    const newToken = generateToken({
-      id: admin.id,
-      email: admin.email
-    });
-
-    // Set new cookie
-    res.cookie('authToken', newToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-      path: '/',
-    });
-
-    res.status(200).json({
-      success: true,
-      data: {
-        message: 'Token refreshed successfully'
-      }
     });
   });
 }

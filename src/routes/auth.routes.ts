@@ -50,7 +50,7 @@ router.get(
 router.post(
   '/refresh',
   authMiddleware,
-  authController.refreshToken
+  authController.refreshToken.bind(authController)
 );
 
 export default router;

@@ -4,8 +4,8 @@ import { AppError } from '../utils/errors';
 import { prisma } from '../lib/prisma';
 
 /**
- * Authentication Middleware
- * Verifies JWT token from httpOnly cookie
+ * Authentication Middleware - Phase 2 (Authorization header)
+ * Reads JWT from Authorization header, not cookies
  */
 export const authMiddleware = async (
   req: Request,
@@ -13,20 +13,20 @@ export const authMiddleware = async (
   next: NextFunction
 ) => {
   try {
-    // Get token from cookie (not from Authorization header anymore)
-    const token = req.cookies.authToken;
-
-    if (!token) {
+    // Get token from Authorization header
+    const authHeader = req.headers.authorization;
+    
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
       throw new AppError('Authentication required. Please login.', 401);
     }
+
+    const token = authHeader.substring(7); // Remove "Bearer " prefix
 
     // Verify token
     let decoded: JWTPayload;
     try {
       decoded = verifyToken(token);
     } catch (error) {
-      // Token invalid or expired
-      res.clearCookie('authToken'); // Clear invalid cookie
       throw new AppError('Invalid or expired token. Please login again.', 401);
     }
 
@@ -42,7 +42,6 @@ export const authMiddleware = async (
     });
 
     if (!admin) {
-      res.clearCookie('authToken');
       throw new AppError('Admin account not found.', 401);
     }
 
@@ -57,40 +56,6 @@ export const authMiddleware = async (
 };
 
 /**
- * Optional Auth Middleware
- * Doesn't fail if no token, just doesn't set req.admin
- * Useful for endpoints that work with or without auth
+ * Backward compatibility export
  */
-export const optionalAuthMiddleware = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
-  try {
-    const token = req.cookies.authToken;
-
-    if (token) {
-      try {
-        const decoded = verifyToken(token);
-        const admin = await prisma.admin.findUnique({
-          where: { id: decoded.id },
-          select: { id: true, email: true, createdAt: true, updatedAt: true }
-        });
-
-        if (admin) {
-          (req as any).admin = admin;
-          (req as any).tokenPayload = decoded;
-        }
-      } catch (error) {
-        // Invalid token, but don't fail - just continue without auth
-        console.warn('Optional auth failed:', error);
-      }
-    }
-
-    next();
-  } catch (error) {
-    next(error);
-  }
-};
-
 export const authenticate = authMiddleware;

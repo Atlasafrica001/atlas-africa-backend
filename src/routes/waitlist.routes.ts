@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { WaitlistController } from '../controllers/waitlist.controller';
-import { validateRequest } from '../middleware/validate.middleware';
+import { validateRequest } from '../middleware/validation.middleware';
 import { waitlistSchema } from '../validators/waitlist.validator';
 import { waitlistLimiter } from '../middleware/rateLimiter.middleware';
 import { authMiddleware } from '../middleware/auth.middleware';

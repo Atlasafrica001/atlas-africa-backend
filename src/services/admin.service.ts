@@ -1,11 +1,11 @@
-import waitlistService from './waitlist.service';
+import { WaitlistService } from './waitlist.service';
 import consultationService from './consultation.service';
 import blogService from './blog.service';
 
 export class AdminService {
   async getStats() {
     const consultations = await consultationService.getStats();
-    const waitlist = await waitlistService.getStats();
+    const waitlist = await WaitlistService.getStats();
     const blog = await blogService.getStats();
 
     return {

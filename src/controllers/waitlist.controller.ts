@@ -1,10 +1,14 @@
 import { Request, Response } from 'express';
 import { WaitlistService } from '../services/waitlist.service';
 import { asyncHandler } from '../utils/asyncHandler';
+import { RateLimitRequestHandler } from 'express-rate-limit';
 
 const waitlistService = new WaitlistService();
 
 export class WaitlistController {
+  static create(arg0: string, waitlistRateLimiter: RateLimitRequestHandler, arg2: (req: Request<import("express-serve-static-core").ParamsDictionary, any, any, import("qs").ParsedQs, Record<string, any>>, res: Response<any, Record<string, any>>, next: import("express").NextFunction) => void, create: any) {
+    throw new Error('Method not implemented.');
+  }
   /**
    * Add to waitlist (Public)
    */

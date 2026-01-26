@@ -22,18 +22,11 @@ model Admin {
   @@index([email])
 }
 
-model WaitlistEntry {
+model Waitlist {
   id        Int      @id @default(autoincrement())
-  name      String   @default("")
   email     String   @unique
-  notified  Boolean  @default(false)
-  createdAt DateTime @default(now()) @map("date")
-  updatedAt DateTime @updatedAt
-
-  @@map("waitlist_entries")
-  @@index([email])
-  @@index([notified])
-  @@index([createdAt])
+  name      String?
+  createdAt DateTime @default(now())
 }
 
 model BlogPost {

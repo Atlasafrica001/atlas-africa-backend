@@ -2,7 +2,7 @@ import { Response } from 'express';
 import { AuthRequest } from '../types/request.types';
 import { sendSuccess, sendError } from '../utils/response.util';
 import adminService from '../services/admin.service';
-import waitlistService from '../services/waitlist.service';
+import { WaitlistService } from '../services/waitlist.service';
 import consultationService from '../services/consultation.service';
 import blogService from '../services/blog.service';
 import uploadService from '../services/upload.service';
@@ -26,10 +26,10 @@ export class AdminController {
       const limit = parseInt(req.query.limit as string) || 50;
       const notified = req.query.notified === 'true' ? true : req.query.notified === 'false' ? false : undefined;
 
-      const result = await waitlistService.getAll({ page, limit, notified });
-      const stats = await waitlistService.getStats();
+      const result = await WaitlistService.getAll({ page, limit, notified });
+      const stats = await WaitlistService.getStats();
 
-      sendSuccess(res, { ...result, stats });
+      sendSuccess(res, Object.assign({}, result, { stats }));
     } catch (error: any) {
       console.error('Get waitlist error:', error);
       sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to fetch waitlist', 500);
@@ -39,7 +39,7 @@ export class AdminController {
   async notifyWaitlist(req: AuthRequest, res: Response): Promise<void> {
     try {
       const id = parseInt(req.params.id);
-      const entry = await waitlistService.markAsNotified(id);
+      const entry = await WaitlistService.markAsNotified(id);
       sendSuccess(res, entry, 'User marked as notified');
     } catch (error: any) {
       console.error('Notify waitlist error:', error);
@@ -54,7 +54,7 @@ export class AdminController {
   async deleteWaitlist(req: AuthRequest, res: Response): Promise<void> {
     try {
       const id = parseInt(req.params.id);
-      await waitlistService.delete(id);
+      await WaitlistService.delete(id);
       sendSuccess(res, null, 'Waitlist entry deleted successfully');
     } catch (error: any) {
       console.error('Delete waitlist error:', error);
@@ -69,7 +69,7 @@ export class AdminController {
   async exportWaitlist(req: AuthRequest, res: Response): Promise<void> {
     try {
       const notified = req.query.notified === 'true' ? true : req.query.notified === 'false' ? false : undefined;
-      const csv = await waitlistService.exportToCsv(notified);
+      const csv = await WaitlistService.exportToCsv(notified);
       
       res.setHeader('Content-Type', 'text/csv');
       res.setHeader('Content-Disposition', `attachment; filename="waitlist-${new Date().toISOString().split('T')[0]}.csv"`);

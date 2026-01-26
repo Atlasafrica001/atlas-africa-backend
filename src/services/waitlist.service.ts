@@ -2,6 +2,24 @@ import { prisma } from '../lib/prisma';
 import { AppError } from '../utils/errors';
 
 export class WaitlistService {
+  static getAll(arg0: {
+    page: number; limit: number; notified: boolean; /**
+ * Get waitlist count
+ */ }) {
+    throw new Error('Method not implemented.');
+  }
+  static getStats() {
+    throw new Error('Method not implemented.');
+  }
+  static markAsNotified(id: number) {
+    throw new Error('Method not implemented.');
+  }
+  static delete(id: number) {
+    throw new Error('Method not implemented.');
+  }
+  static exportToCsv(notified: boolean) {
+    throw new Error('Method not implemented.');
+  }
   /**
    * Add email to waitlist
    */

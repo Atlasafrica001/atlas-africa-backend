@@ -1,23 +1,29 @@
 import { Request, Response, NextFunction } from 'express';
-import { AnyZodObject, ZodError } from 'zod';
-import { AppError } from '../utils/errors';
+import { ZodSchema, ZodError } from 'zod';
+import { sendError } from '../utils/response.util';
 
-export const validateRequest = (schema: AnyZodObject) => {
-  return async (req: Request, res: Response, next: NextFunction) => {
+/**
+ * Validation middleware factory
+ * @param schema Zod schema to validate against
+ * @returns Express middleware function
+ */
+export const validate = (schema: ZodSchema) => {
+  return (req: Request, res: Response, next: NextFunction): void => {
     try {
-      await schema.parseAsync(req.body);
+      schema.parse(req.body);
       next();
     } catch (error) {
       if (error instanceof ZodError) {
-        const errors = error.errors.map(err => ({
+        const details = error.errors.map((err) => ({
           field: err.path.join('.'),
-          message: err.message
+          message: err.message,
         }));
 
-        next(new AppError('Validation failed', 422));
-      } else {
-        next(error);
+        sendError(res, 'VALIDATION_ERROR', 'Invalid input', 422, details);
+        return;
       }
+
+      sendError(res, 'VALIDATION_ERROR', 'Validation failed', 422);
     }
   };
 };

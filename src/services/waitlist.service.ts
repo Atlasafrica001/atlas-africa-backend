@@ -1,85 +1,99 @@
-import { prisma } from '../config/database';
-import { WaitlistEntry } from '@prisma/client';
+import { prisma } from '../lib/prisma';
+import { AppError } from '../utils/errors';
 
 export class WaitlistService {
-  async create(email: string): Promise<WaitlistEntry> {
-    return await prisma.waitlistEntry.create({
-      data: { email },
+  /**
+   * Add email to waitlist
+   */
+  async addToWaitlist(email: string, name?: string) {
+    // Normalize email
+    const normalizedEmail = email.toLowerCase().trim();
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(normalizedEmail)) {
+      throw new AppError('Invalid email format', 400);
+    }
+
+    // Check if already exists
+    const existing = await prisma.waitlist.findUnique({
+      where: { email: normalizedEmail }
     });
-  }
 
-  async getAll(params?: {
-    page?: number;
-    limit?: number;
-    notified?: boolean;
-  }) {
-    const page = params?.page || 1;
-    const limit = params?.limit || 50;
-    const skip = (page - 1) * limit;
+    if (existing) {
+      throw new AppError('This email is already on the waitlist', 409);
+    }
 
-    const where = params?.notified !== undefined 
-      ? { notified: params.notified } 
-      : {};
-
-    const [entries, total] = await Promise.all([
-      prisma.waitlistEntry.findMany({
-        where,
-        orderBy: { createdAt: 'desc' },
-        skip,
-        take: limit,
-      }),
-      prisma.waitlistEntry.count({ where }),
-    ]);
-
-    return {
-      entries,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-      },
-    };
-  }
-
-  async markAsNotified(id: number): Promise<WaitlistEntry> {
-    return await prisma.waitlistEntry.update({
-      where: { id },
-      data: { notified: true },
+    // Add to waitlist
+    const waitlistEntry = await prisma.waitlist.create({
+      data: {
+        email: normalizedEmail,
+        name: name?.trim() || null,
+      }
     });
+
+    return waitlistEntry;
   }
 
-  async delete(id: number): Promise<void> {
-    await prisma.waitlistEntry.delete({ where: { id } });
-  }
-
-  async getStats() {
-    const total = await prisma.waitlistEntry.count();
-    const notified = await prisma.waitlistEntry.count({
-      where: { notified: true },
-    });
-    return {
-      total,
-      notified,
-      pending: total - notified,
-    };
-  }
-
-  async exportToCsv(notified?: boolean) {
-    const where = notified !== undefined ? { notified } : {};
-    const entries = await prisma.waitlistEntry.findMany({
-      where,
+  /**
+   * Get all waitlist entries (admin only)
+   */
+  async getAllEntries() {
+    const entries = await prisma.waitlist.findMany({
       orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        createdAt: true,
+      }
     });
 
-    // Generate CSV
-    const headers = 'id,name,email,notified,date\n';
-    const rows = entries.map(entry => 
-      `${entry.id},"${entry.name}","${entry.email}",${entry.notified},"${entry.createdAt.toISOString()}"`
-    ).join('\n');
+    return entries;
+  }
 
-    return headers + rows;
+  /**
+   * Get waitlist count
+   */
+  async getCount() {
+    return prisma.waitlist.count();
+  }
+
+  /**
+   * Delete waitlist entry (admin only)
+   */
+  async deleteEntry(id: number) {
+    const entry = await prisma.waitlist.findUnique({
+      where: { id }
+    });
+
+    if (!entry) {
+      throw new AppError('Waitlist entry not found', 404);
+    }
+
+    await prisma.waitlist.delete({
+      where: { id }
+    });
+
+    return { message: 'Waitlist entry deleted successfully' };
+  }
+
+  /**
+   * Export waitlist to CSV format
+   */
+  async exportToCSV() {
+    const entries = await prisma.waitlist.findMany({
+      orderBy: { createdAt: 'desc' }
+    });
+
+    // Create CSV header
+    let csv = 'ID,Email,Name,Created At\n';
+
+    // Add entries
+    entries.forEach(entry => {
+      csv += `${entry.id},"${entry.email}","${entry.name || ''}","${entry.createdAt.toISOString()}"\n`;
+    });
+
+    return csv;
   }
 }
-
-export default new WaitlistService();

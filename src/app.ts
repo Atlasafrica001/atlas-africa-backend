@@ -7,6 +7,7 @@ import authRoutes from './routes/auth.routes';
 import { errorHandler, notFoundHandler } from './middleware/error.middleware';
 import { requestIdMiddleware } from './middleware/requestId.middleware';
 import { apiLimiter } from './middleware/rateLimiter.middleware';
+import waitlistRoutes from './routes/waitlist.routes';
 
 const app: Application = express();
 
@@ -72,6 +73,10 @@ if (process.env.NODE_ENV === 'development') {
 } else {
   app.use(morgan('combined'));
 }
+
+
+
+app.use('/api/v1/waitlist', waitlistRoutes);
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // 7. RATE LIMITING

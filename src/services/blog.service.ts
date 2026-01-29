@@ -1,173 +1,200 @@
-import { prisma } from '../config/database';
-import { BlogPost, BlogPostStatus } from '@prisma/client';
-import { CreateBlogPost, UpdateBlogPost } from '../types/request.types';
-import { generateSlug } from '../utils/slug.util';
+import { prisma } from '../lib/prisma';
+import { AppError } from '../utils/errors';
 
 export class BlogService {
-  async create(data: CreateBlogPost): Promise<BlogPost> {
-    const slug = generateSlug(data.title);
+  /**
+   * Generate URL-friendly slug from title
+   */
+  private generateSlug(title: string): string {
+    return title
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+  }
 
-    return await prisma.blogPost.create({
+  /**
+   * Create blog post
+   */
+  async createPost(data: {
+    title: string;
+    content: string;
+    excerpt?: string;
+    published?: boolean;
+    featuredImage?: string;
+  }) {
+    const slug = this.generateSlug(data.title);
+
+    // Check if slug already exists
+    const existing = await prisma.blogPost.findUnique({
+      where: { slug }
+    });
+
+    if (existing) {
+      throw new AppError('A post with this title already exists', 409);
+    }
+
+    const post = await prisma.blogPost.create({
       data: {
-        ...data,
+        title: data.title,
         slug,
-        status: data.status.toUpperCase() as BlogPostStatus,
-        publishedAt: data.status === 'published' ? new Date() : null,
-      },
+        content: data.content,
+        excerpt: data.excerpt || this.generateExcerpt(data.content),
+        published: data.published || false,
+        featuredImage: data.featuredImage,
+      }
     });
+
+    return post;
   }
 
-  async getPublishedPosts(params?: {
-    page?: number;
-    limit?: number;
-    featured?: boolean;
-    category?: string;
-  }) {
-    const page = params?.page || 1;
-    const limit = params?.limit || 10;
-    const skip = (page - 1) * limit;
+  /**
+   * Get all posts (with optional published filter)
+   */
+  async getAllPosts(published?: boolean) {
+    const posts = await prisma.blogPost.findMany({
+      where: published !== undefined ? { published } : undefined,
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        title: true,
+        slug: true,
+        excerpt: true,
+        featuredImage: true,
+        published: true,
+        createdAt: true,
+        updatedAt: true,
+      }
+    });
 
-    const where: any = { status: 'PUBLISHED' };
-    
-    if (params?.featured !== undefined) {
-      where.featured = params.featured;
-    }
-
-    if (params?.category) {
-      where.categories = {
-        has: params.category,
-      };
-    }
-
-    const [posts, total] = await Promise.all([
-      prisma.blogPost.findMany({
-        where,
-        orderBy: { publishedAt: 'desc' },
-        skip,
-        take: limit,
-      }),
-      prisma.blogPost.count({ where }),
-    ]);
-
-    return {
-      posts,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-      },
-    };
+    return posts;
   }
 
-  async getAllPosts(params?: {
-    page?: number;
-    limit?: number;
-    status?: string;
-    featured?: boolean;
-  }) {
-    const page = params?.page || 1;
-    const limit = params?.limit || 20;
-    const skip = (page - 1) * limit;
-
-    const where: any = {};
-    
-    if (params?.status) {
-      where.status = params.status.toUpperCase() as BlogPostStatus;
-    }
-
-    if (params?.featured !== undefined) {
-      where.featured = params.featured;
-    }
-
-    const [posts, total] = await Promise.all([
-      prisma.blogPost.findMany({
-        where,
-        orderBy: { createdAt: 'desc' },
-        skip,
-        take: limit,
-      }),
-      prisma.blogPost.count({ where }),
-    ]);
-
-    return {
-      posts,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-      },
-    };
-  }
-
-  async getBySlug(slug: string): Promise<BlogPost | null> {
+  /**
+   * Get single post by slug
+   */
+  async getPostBySlug(slug: string, includeUnpublished: boolean = false) {
     const post = await prisma.blogPost.findUnique({
-      where: { slug },
+      where: { slug }
     });
 
-    if (post && post.status === 'PUBLISHED') {
-      // Increment views
-      await prisma.blogPost.update({
-        where: { id: post.id },
-        data: { views: { increment: 1 } },
-      });
+    if (!post) {
+      throw new AppError('Blog post not found', 404);
+    }
+
+    if (!post.published && !includeUnpublished) {
+      throw new AppError('Blog post not found', 404);
     }
 
     return post;
   }
 
-  async getById(id: number): Promise<BlogPost | null> {
-    return await prisma.blogPost.findUnique({
-      where: { id },
+  /**
+   * Get single post by ID (admin)
+   */
+  async getPostById(id: number) {
+    const post = await prisma.blogPost.findUnique({
+      where: { id }
     });
-  }
 
-  async update(id: number, data: UpdateBlogPost): Promise<BlogPost> {
-    const updateData: any = { ...data };
-
-    if (data.title) {
-      updateData.slug = generateSlug(data.title);
+    if (!post) {
+      throw new AppError('Blog post not found', 404);
     }
 
-    if (data.status) {
-      updateData.status = data.status.toUpperCase() as BlogPostStatus;
-      
-      // Set publishedAt when publishing
-      if (data.status === 'published') {
-        const existing = await this.getById(id);
-        if (existing && !existing.publishedAt) {
-          updateData.publishedAt = new Date();
-        }
-      } else if (data.status === 'draft') {
-        updateData.publishedAt = null;
+    return post;
+  }
+
+  /**
+   * Update post
+   */
+  async updatePost(id: number, data: {
+    title?: string;
+    content?: string;
+    excerpt?: string;
+    published?: boolean;
+    featuredImage?: string;
+  }) {
+    const post = await prisma.blogPost.findUnique({
+      where: { id }
+    });
+
+    if (!post) {
+      throw new AppError('Blog post not found', 404);
+    }
+
+    // Generate new slug if title changed
+    let slug = post.slug;
+    if (data.title && data.title !== post.title) {
+      slug = this.generateSlug(data.title);
+
+      // Check if new slug conflicts
+      const existing = await prisma.blogPost.findUnique({
+        where: { slug }
+      });
+
+      if (existing && existing.id !== id) {
+        throw new AppError('A post with this title already exists', 409);
       }
     }
 
-    return await prisma.blogPost.update({
+    const updated = await prisma.blogPost.update({
       where: { id },
-      data: updateData,
+      data: {
+        ...data,
+        slug,
+        excerpt: data.excerpt || (data.content ? this.generateExcerpt(data.content) : post.excerpt),
+      }
     });
+
+    return updated;
   }
 
-  async delete(id: number): Promise<void> {
-    await prisma.blogPost.delete({ where: { id } });
+  /**
+   * Delete post
+   */
+  async deletePost(id: number) {
+    const post = await prisma.blogPost.findUnique({
+      where: { id }
+    });
+
+    if (!post) {
+      throw new AppError('Blog post not found', 404);
+    }
+
+    await prisma.blogPost.delete({
+      where: { id }
+    });
+
+    return { message: 'Blog post deleted successfully' };
   }
 
-  async getStats() {
-    const total = await prisma.blogPost.count();
-    const published = await prisma.blogPost.count({
-      where: { status: 'PUBLISHED' },
+  /**
+   * Toggle publish status
+   */
+  async togglePublish(id: number) {
+    const post = await prisma.blogPost.findUnique({
+      where: { id }
     });
-    const drafts = total - published;
 
-    const posts = await prisma.blogPost.findMany({
-      select: { views: true },
+    if (!post) {
+      throw new AppError('Blog post not found', 404);
+    }
+
+    const updated = await prisma.blogPost.update({
+      where: { id },
+      data: { published: !post.published }
     });
-    const totalViews = posts.reduce((sum, post) => sum + post.views, 0);
 
-    return { total, published, drafts, totalViews };
+    return updated;
+  }
+
+  /**
+   * Generate excerpt from content (first 160 chars)
+   */
+  private generateExcerpt(content: string): string {
+    // Strip HTML tags and get first 160 characters
+    const plain = content.replace(/<[^>]*>/g, '');
+    return plain.length > 160 
+      ? plain.substring(0, 160) + '...' 
+      : plain;
   }
 }
-
-export default new BlogService();

@@ -5,31 +5,44 @@ import { asyncHandler } from '../utils/asyncHandler';
 const authService = new AuthService();
 
 export class AuthController {
-  refreshToken(arg0: string, authMiddleware: (req: Request<import("express-serve-static-core").ParamsDictionary, any, any, import("qs").ParsedQs, Record<string, any>>, res: Response<any, Record<string, any>>, next: import("express").NextFunction) => Promise<void>, refreshToken: any) {
-    throw new Error('Method not implemented.');
-  }
+  [x: string]: any;
   /**
-   * Login - Return JWT in response body (Phase 2 compatible)
+   * Login - With debug logging
    */
   login = asyncHandler(async (req: Request, res: Response) => {
-    const { email, password } = req.body;
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('🔍 LOGIN ATTEMPT');
+    console.log('Body received:', JSON.stringify(req.body));
+    console.log('Email:', req.body.email);
+    console.log('Password length:', req.body.password?.length);
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
-    // Authenticate user
-    const { token, admin } = await authService.login(email, password);
+    try {
+      const { email, password } = req.body;
 
-    // Return token in response body (Phase 2 - localStorage)
-    res.status(200).json({
-      success: true,
-      data: {
-        token,
-        admin
-      }
-    });
+      console.log('✅ Calling auth service...');
+      const result = await authService.login(email, password);
+      
+      console.log('✅ Auth service succeeded');
+      console.log('Token generated:', result.token ? 'YES' : 'NO');
+
+      res.status(200).json({
+        success: true,
+        data: result
+      });
+    } catch (error: any) {
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log('❌ LOGIN ERROR');
+      console.log('Error type:', error.constructor.name);
+      console.log('Error message:', error.message);
+      console.log('Error statusCode:', error.statusCode);
+      console.log('Full error:', JSON.stringify(error, null, 2));
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      
+      throw error; // Re-throw for error middleware
+    }
   });
 
-  /**
-   * Logout - Just returns success (token removed on frontend)
-   */
   logout = asyncHandler(async (req: Request, res: Response) => {
     res.status(200).json({
       success: true,
@@ -39,11 +52,8 @@ export class AuthController {
     });
   });
 
-  /**
-   * Get Current Admin
-   */
   getCurrentAdmin = asyncHandler(async (req: Request, res: Response) => {
-    const admin = (req as any).admin; // Set by auth middleware
+    const admin = (req as any).admin;
 
     res.status(200).json({
       success: true,

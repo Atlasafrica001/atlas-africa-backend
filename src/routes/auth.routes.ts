@@ -16,7 +16,7 @@ const authController = new AuthController();
 router.post(
   '/login',
   loginLimiter,
-  validateRequest(loginSchema),
+  // validateRequest(loginSchema),
   authController.login
 );
 

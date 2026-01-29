@@ -8,6 +8,7 @@ import { errorHandler, notFoundHandler } from './middleware/error.middleware';
 import { requestIdMiddleware } from './middleware/requestId.middleware';
 import { apiLimiter } from './middleware/rateLimiter.middleware';
 import waitlistRoutes from './routes/waitlist.routes';
+import blogRoutes from './routes/blog.routes';
 
 const app: Application = express();
 
@@ -119,5 +120,8 @@ app.use('*', notFoundHandler);
 // 11. ERROR HANDLER
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 app.use(errorHandler);
+
+// After other routes:
+app.use('/api/v1/blog', blogRoutes);
 
 export default app;

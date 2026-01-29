@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { verifyToken, JWTPayload } from '../utils/jwt';
-import { AppError } from '../utils/errors';
 import { prisma } from '../lib/prisma';
+import { AppError } from '../utils/errors';
 
 /**
  * Authentication Middleware - Phase 2 (Authorization header)
@@ -52,6 +52,59 @@ export const authMiddleware = async (
     next();
   } catch (error) {
     next(error);
+  }
+};
+
+/**
+ * Optional Authentication Middleware
+ * Attaches admin if token is valid, but doesn't fail if missing
+ * Useful for public routes that have admin-only features
+ */
+export const optionalAuthMiddleware = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const authHeader = req.headers.authorization;
+    
+    // No token? That's fine, continue without admin
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return next();
+    }
+
+    const token = authHeader.substring(7);
+
+    // Try to verify token
+    let decoded: JWTPayload;
+    try {
+      decoded = verifyToken(token);
+    } catch (error) {
+      // Invalid token? Continue without admin
+      return next();
+    }
+
+    // Get admin from database
+    const admin = await prisma.admin.findUnique({
+      where: { id: decoded.id },
+      select: {
+        id: true,
+        email: true,
+        createdAt: true,
+        updatedAt: true,
+      }
+    });
+
+    // Attach admin if found
+    if (admin) {
+      (req as any).admin = admin;
+      (req as any).tokenPayload = decoded;
+    }
+
+    next();
+  } catch (error) {
+    // Any error? Just continue without admin
+    next();
   }
 };
 

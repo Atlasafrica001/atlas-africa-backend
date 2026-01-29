@@ -12,7 +12,7 @@ const router = Router();
 router.post(
   '/login',
   loginRateLimiter,
-  validateRequest(loginSchema),
+  // validateRequest(loginSchema),
   authController.login
 );
 

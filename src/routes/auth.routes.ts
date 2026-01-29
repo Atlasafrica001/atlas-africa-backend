@@ -42,15 +42,15 @@ router.get(
   authController.getCurrentAdmin
 );
 
-/**
- * @route   POST /api/v1/auth/refresh
- * @desc    Refresh authentication token
- * @access  Private
- */
-router.post(
-  '/refresh',
-  authMiddleware,
-  authController.refreshToken.bind(authController)
-);
+// /**
+//  * @route   POST /api/v1/auth/refresh
+//  * @desc    Refresh authentication token
+//  * @access  Private
+//  */
+// router.post(
+//   '/refresh',
+//   authMiddleware,
+//   authController.refreshToken.bind(authController)
+// );
 
 export default router;

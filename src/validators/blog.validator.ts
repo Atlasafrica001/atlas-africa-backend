@@ -7,8 +7,9 @@ export const createBlogSchema = z.object({
   title: z.string().min(1, 'Title is required').max(200),
   content: z.string().min(1, 'Content is required'),
   excerpt: z.string().max(500).optional(),
-  published: z.boolean().optional(),
-  featuredImage: z.string().url('Must be a valid URL').optional()
+  coverImage: z.string().url('Must be a valid URL').optional().nullable(),
+  author: z.string().max(100).optional(),
+  publishedAt: z.string().datetime().optional().nullable()
 });
 
 /**
@@ -18,9 +19,14 @@ export const updateBlogSchema = z.object({
   title: z.string().min(1).max(200).optional(),
   content: z.string().min(1).optional(),
   excerpt: z.string().max(500).optional(),
-  published: z.boolean().optional(),
-  featuredImage: z.string().url().optional()
+  coverImage: z.string().url().optional().nullable(),
+  author: z.string().max(100).optional(),
+  publishedAt: z.string().datetime().optional().nullable()
 });
+
+// Aliases for backward compatibility
+export const createBlogPostSchema = createBlogSchema;
+export const updateBlogPostSchema = updateBlogSchema;
 
 export type CreateBlogInput = z.infer<typeof createBlogSchema>;
 export type UpdateBlogInput = z.infer<typeof updateBlogSchema>;

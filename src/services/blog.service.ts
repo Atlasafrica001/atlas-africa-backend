@@ -19,8 +19,9 @@ export class BlogService {
     title: string;
     content: string;
     excerpt?: string;
-    published?: boolean;
-    featuredImage?: string;
+    coverImage?: string;
+    author?: string;
+    publishedAt?: Date;
   }) {
     const slug = this.generateSlug(data.title);
 
@@ -39,8 +40,10 @@ export class BlogService {
         slug,
         content: data.content,
         excerpt: data.excerpt || this.generateExcerpt(data.content),
-        published: data.published || false,
-        featuredImage: data.featuredImage,
+        coverImage: data.coverImage,
+        author: data.author || 'Atlas Africa',
+        status: data.publishedAt ? 'PUBLISHED' : 'DRAFT',
+        publishedAt: data.publishedAt || null,
       }
     });
 
@@ -48,25 +51,32 @@ export class BlogService {
   }
 
   /**
-   * Get all posts (with optional published filter)
+   * Get all posts (with optional status filter)
    */
-  async getAllPosts(published?: boolean) {
+  async getAllPosts(publishedOnly?: boolean) {
     const posts = await prisma.blogPost.findMany({
-      where: published !== undefined ? { published } : undefined,
+      where: publishedOnly ? { status: 'PUBLISHED' } : undefined,
       orderBy: { createdAt: 'desc' },
       select: {
         id: true,
         title: true,
         slug: true,
         excerpt: true,
-        featuredImage: true,
-        published: true,
+        coverImage: true,
+        author: true,
+        status: true,
+        publishedAt: true,
         createdAt: true,
         updatedAt: true,
       }
     });
 
-    return posts;
+    // Transform to match frontend expectations
+    return posts.map(post => ({
+      ...post,
+      featuredImage: post.coverImage, // Alias for frontend
+      published: post.status === 'PUBLISHED' // Alias for frontend
+    }));
   }
 
   /**
@@ -81,11 +91,15 @@ export class BlogService {
       throw new AppError('Blog post not found', 404);
     }
 
-    if (!post.published && !includeUnpublished) {
+    if (post.status !== 'PUBLISHED' && !includeUnpublished) {
       throw new AppError('Blog post not found', 404);
     }
 
-    return post;
+    return {
+      ...post,
+      featuredImage: post.coverImage, // Alias for frontend
+      published: post.status === 'PUBLISHED' // Alias for frontend
+    };
   }
 
   /**
@@ -100,7 +114,11 @@ export class BlogService {
       throw new AppError('Blog post not found', 404);
     }
 
-    return post;
+    return {
+      ...post,
+      featuredImage: post.coverImage, // Alias for frontend
+      published: post.status === 'PUBLISHED' // Alias for frontend
+    };
   }
 
   /**
@@ -110,8 +128,9 @@ export class BlogService {
     title?: string;
     content?: string;
     excerpt?: string;
-    published?: boolean;
-    featuredImage?: string;
+    coverImage?: string;
+    author?: string;
+    publishedAt?: Date;
   }) {
     const post = await prisma.blogPost.findUnique({
       where: { id }
@@ -145,7 +164,11 @@ export class BlogService {
       }
     });
 
-    return updated;
+    return {
+      ...updated,
+      featuredImage: updated.coverImage,
+      published: updated.status === 'PUBLISHED'
+    };
   }
 
   /**
@@ -179,12 +202,22 @@ export class BlogService {
       throw new AppError('Blog post not found', 404);
     }
 
+    const newStatus = post.status === 'PUBLISHED' ? 'DRAFT' : 'PUBLISHED';
+    const publishedAt = newStatus === 'PUBLISHED' ? new Date() : null;
+
     const updated = await prisma.blogPost.update({
       where: { id },
-      data: { published: !post.published }
+      data: { 
+        status: newStatus,
+        publishedAt
+      }
     });
 
-    return updated;
+    return {
+      ...updated,
+      featuredImage: updated.coverImage,
+      published: updated.status === 'PUBLISHED'
+    };
   }
 
   /**

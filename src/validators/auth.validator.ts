@@ -4,8 +4,7 @@ import { z } from 'zod';
  * Login request validation schema
  */
 export const loginSchema = z.object({
-  body: z.object({
-    email: z
+  email: z
       .string({
         required_error: 'Email is required'
       })
@@ -17,7 +16,6 @@ export const loginSchema = z.object({
         required_error: 'Password is required'
       })
       .min(1, 'Password cannot be empty')
-  })
 });
 
 export type LoginInput = z.infer<typeof loginSchema>;

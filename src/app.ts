@@ -78,6 +78,7 @@ if (process.env.NODE_ENV === 'development') {
 
 
 app.use('/api/v1/waitlist', waitlistRoutes);
+app.use('/api/v1/blog', blogRoutes);
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // 7. RATE LIMITING
@@ -121,7 +122,6 @@ app.use('*', notFoundHandler);
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 app.use(errorHandler);
 
-// After other routes:
-app.use('/api/v1/blog', blogRoutes);
+
 
 export default app;

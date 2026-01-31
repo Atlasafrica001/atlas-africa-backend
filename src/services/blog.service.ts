@@ -21,6 +21,7 @@ export class BlogService {
     excerpt?: string;
     coverImage?: string;
     author?: string;
+    categories?: string[];
     publishedAt?: Date;
   }) {
     const slug = this.generateSlug(data.title);
@@ -42,6 +43,7 @@ export class BlogService {
         excerpt: data.excerpt || this.generateExcerpt(data.content),
         coverImage: data.coverImage,
         author: data.author || 'Atlas Africa',
+        categories: data.categories || [],
         status: data.publishedAt ? 'PUBLISHED' : 'DRAFT',
         publishedAt: data.publishedAt || null,
       }
@@ -51,11 +53,14 @@ export class BlogService {
   }
 
   /**
-   * Get all posts (with optional status filter)
+   * Get all posts (with optional status filter and category filter)
    */
-  async getAllPosts(publishedOnly?: boolean) {
+  async getAllPosts(publishedOnly?: boolean, category?: string) {
     const posts = await prisma.blogPost.findMany({
-      where: publishedOnly ? { status: 'PUBLISHED' } : undefined,
+      where: {
+        ...(publishedOnly ? { status: 'PUBLISHED' } : {}),
+        ...(category ? { categories: { has: category } } : {})
+      },
       orderBy: { createdAt: 'desc' },
       select: {
         id: true,
@@ -64,10 +69,14 @@ export class BlogService {
         excerpt: true,
         coverImage: true,
         author: true,
+        categories: true,
         status: true,
         publishedAt: true,
         createdAt: true,
         updatedAt: true,
+        views: true,
+        readTime: true,
+        featured: true,
       }
     });
 
@@ -75,7 +84,8 @@ export class BlogService {
     return posts.map(post => ({
       ...post,
       featuredImage: post.coverImage, // Alias for frontend
-      published: post.status === 'PUBLISHED' // Alias for frontend
+      published: post.status === 'PUBLISHED', // Alias for frontend
+      category: post.categories[0] || null, // First category for backwards compatibility
     }));
   }
 
@@ -95,10 +105,17 @@ export class BlogService {
       throw new AppError('Blog post not found', 404);
     }
 
+    // Increment views
+    await prisma.blogPost.update({
+      where: { id: post.id },
+      data: { views: { increment: 1 } }
+    });
+
     return {
       ...post,
-      featuredImage: post.coverImage, // Alias for frontend
-      published: post.status === 'PUBLISHED' // Alias for frontend
+      featuredImage: post.coverImage,
+      published: post.status === 'PUBLISHED',
+      category: post.categories[0] || null,
     };
   }
 
@@ -116,8 +133,9 @@ export class BlogService {
 
     return {
       ...post,
-      featuredImage: post.coverImage, // Alias for frontend
-      published: post.status === 'PUBLISHED' // Alias for frontend
+      featuredImage: post.coverImage,
+      published: post.status === 'PUBLISHED',
+      category: post.categories[0] || null,
     };
   }
 
@@ -130,6 +148,7 @@ export class BlogService {
     excerpt?: string;
     coverImage?: string;
     author?: string;
+    categories?: string[];
     publishedAt?: Date;
   }) {
     const post = await prisma.blogPost.findUnique({
@@ -167,7 +186,8 @@ export class BlogService {
     return {
       ...updated,
       featuredImage: updated.coverImage,
-      published: updated.status === 'PUBLISHED'
+      published: updated.status === 'PUBLISHED',
+      category: updated.categories[0] || null,
     };
   }
 
@@ -216,15 +236,28 @@ export class BlogService {
     return {
       ...updated,
       featuredImage: updated.coverImage,
-      published: updated.status === 'PUBLISHED'
+      published: updated.status === 'PUBLISHED',
+      category: updated.categories[0] || null,
     };
+  }
+
+  /**
+   * Get all unique categories
+   */
+  async getAllCategories(): Promise<string[]> {
+    const posts = await prisma.blogPost.findMany({
+      where: { status: 'PUBLISHED' },
+      select: { categories: true }
+    });
+
+    const allCategories = posts.flatMap(post => post.categories);
+    return [...new Set(allCategories)].sort();
   }
 
   /**
    * Generate excerpt from content (first 160 chars)
    */
   private generateExcerpt(content: string): string {
-    // Strip HTML tags and get first 160 characters
     const plain = content.replace(/<[^>]*>/g, '');
     return plain.length > 160 
       ? plain.substring(0, 160) + '...' 

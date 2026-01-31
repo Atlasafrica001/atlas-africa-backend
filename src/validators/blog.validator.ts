@@ -1,12 +1,12 @@
 import { z } from 'zod';
 
 /**
- * URL validation regex - more lenient
+ * URL validation regex
  */
 const urlRegex = /^https?:\/\/.+/i;
 
 /**
- * Create blog post validation
+ * Create blog post validation with categories array
  */
 export const createBlogSchema = z.object({
   title: z.string().min(1, 'Title is required').max(200),
@@ -20,11 +20,12 @@ export const createBlogSchema = z.object({
     .or(z.literal(''))
     .transform(val => val === '' ? null : val),
   author: z.string().max(100).optional().nullable(),
+  categories: z.array(z.string()).optional().default([]), // Array of categories
   publishedAt: z.string().datetime().optional().nullable()
 });
 
 /**
- * Update blog post validation
+ * Update blog post validation with categories array
  */
 export const updateBlogSchema = z.object({
   title: z.string().min(1).max(200).optional(),
@@ -38,6 +39,7 @@ export const updateBlogSchema = z.object({
     .or(z.literal(''))
     .transform(val => val === '' ? null : val),
   author: z.string().max(100).optional().nullable(),
+  categories: z.array(z.string()).optional(), // Array of categories
   publishedAt: z.string().datetime().optional().nullable()
 });
 

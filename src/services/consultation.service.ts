@@ -1,111 +1,165 @@
-import { prisma } from '../config/database';
-import { ConsultationRequest, ConsultationStatus } from '@prisma/client';
-import { ConsultationSubmission, UpdateConsultationStatus } from '../types/request.types';
+import { prisma } from '../lib/prisma';
+import { AppError } from '../utils/errors';
 
 export class ConsultationService {
-  async create(data: ConsultationSubmission): Promise<ConsultationRequest> {
-    return await prisma.consultationRequest.create({
-      data,
-    });
-  }
-
-  async getAll(params?: {
-    page?: number;
-    limit?: number;
+  /**
+   * Get all consultation requests
+   */
+  async getAllConsultations(filters?: {
     status?: string;
+    search?: string;
+    limit?: number;
+    offset?: number;
   }) {
-    const page = params?.page || 1;
-    const limit = params?.limit || 50;
-    const skip = (page - 1) * limit;
+    const { status, search, limit = 50, offset = 0 } = filters || {};
 
-    const where = params?.status 
-      ? { status: params.status.toUpperCase() as ConsultationStatus }
-      : {};
+    const where: any = {};
+
+    // Filter by status if provided
+    if (status) {
+      where.status = status;
+    }
+
+    // Search by name or email or company
+    if (search) {
+      where.OR = [
+        { fullName: { contains: search, mode: 'insensitive' } },
+        { email: { contains: search, mode: 'insensitive' } },
+        { company: { contains: search, mode: 'insensitive' } }
+      ];
+    }
 
     const [consultations, total] = await Promise.all([
       prisma.consultationRequest.findMany({
         where,
         orderBy: { createdAt: 'desc' },
-        skip,
         take: limit,
+        skip: offset
       }),
-      prisma.consultationRequest.count({ where }),
+      prisma.consultationRequest.count({ where })
+    ]);
+
+    return { consultations, total };
+  }
+
+  /**
+   * Get single consultation by ID
+   */
+  async getConsultationById(id: number) {
+    const consultation = await prisma.consultationRequest.findUnique({
+      where: { id }
+    });
+
+    if (!consultation) {
+      throw new AppError('Consultation request not found', 404);
+    }
+
+    return consultation;
+  }
+
+  /**
+   * Update consultation status
+   */
+  async updateStatus(id: number, status: string) {
+    const validStatuses = ['PENDING', 'CONTACTED', 'CONVERTED'];
+    
+    if (!validStatuses.includes(status)) {
+      throw new AppError('Invalid status. Must be PENDING, CONTACTED, or CONVERTED', 400);
+    }
+
+    const consultation = await prisma.consultationRequest.findUnique({
+      where: { id }
+    });
+
+    if (!consultation) {
+      throw new AppError('Consultation request not found', 404);
+    }
+
+    const updated = await prisma.consultationRequest.update({
+      where: { id },
+      data: { status: status as any }
+    });
+
+    return updated;
+  }
+
+  /**
+   * Add admin notes to consultation
+   */
+  async addNotes(id: number, notes: string) {
+    const consultation = await prisma.consultationRequest.findUnique({
+      where: { id }
+    });
+
+    if (!consultation) {
+      throw new AppError('Consultation request not found', 404);
+    }
+
+    const updated = await prisma.consultationRequest.update({
+      where: { id },
+      data: { adminNotes: notes }
+    });
+
+    return updated;
+  }
+
+  /**
+   * Delete consultation
+   */
+  async deleteConsultation(id: number) {
+    const consultation = await prisma.consultationRequest.findUnique({
+      where: { id }
+    });
+
+    if (!consultation) {
+      throw new AppError('Consultation request not found', 404);
+    }
+
+    await prisma.consultationRequest.delete({
+      where: { id }
+    });
+
+    return { message: 'Consultation deleted successfully' };
+  }
+
+  /**
+   * Get consultation statistics
+   */
+  async getConsultationStats() {
+    const [total, pending, contacted, converted] = await Promise.all([
+      prisma.consultationRequest.count(),
+      prisma.consultationRequest.count({ where: { status: 'PENDING' } }),
+      prisma.consultationRequest.count({ where: { status: 'CONTACTED' } }),
+      prisma.consultationRequest.count({ where: { status: 'CONVERTED' } })
     ]);
 
     return {
-      consultations,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-      },
+      total,
+      pending,
+      contacted,
+      converted
     };
   }
 
-  async getById(id: number): Promise<ConsultationRequest | null> {
-    return await prisma.consultationRequest.findUnique({
+  /**
+   * Mark consultation as contacted
+   */
+  async markAsContacted(id: number) {
+    const consultation = await prisma.consultationRequest.findUnique({
+      where: { id }
+    });
+
+    if (!consultation) {
+      throw new AppError('Consultation request not found', 404);
+    }
+
+    const updated = await prisma.consultationRequest.update({
       where: { id },
-    });
-  }
-
-  async updateStatus(
-    id: number,
-    data: UpdateConsultationStatus
-  ): Promise<ConsultationRequest> {
-    return await prisma.consultationRequest.update({
-      where: { id },
-      data: {
-        status: data.status.toUpperCase() as ConsultationStatus,
-        adminNotes: data.adminNotes,
-      },
-    });
-  }
-
-  async getStats() {
-    const total = await prisma.consultationRequest.count();
-    const pending = await prisma.consultationRequest.count({
-      where: { status: 'PENDING' },
-    });
-    const contacted = await prisma.consultationRequest.count({
-      where: { status: 'CONTACTED' },
-    });
-    const converted = await prisma.consultationRequest.count({
-      where: { status: 'CONVERTED' },
+      data: { 
+        status: 'CONTACTED'
+      }
     });
 
-    // Calculate new this month
-    const startOfMonth = new Date();
-    startOfMonth.setDate(1);
-    startOfMonth.setHours(0, 0, 0, 0);
-
-    const newThisMonth = await prisma.consultationRequest.count({
-      where: {
-        createdAt: { gte: startOfMonth },
-      },
-    });
-
-    return { total, pending, contacted, converted, newThisMonth };
-  }
-
-  async exportToCsv(status?: string) {
-    const where = status 
-      ? { status: status.toUpperCase() as ConsultationStatus }
-      : {};
-
-    const consultations = await prisma.consultationRequest.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
-    });
-
-    // Generate CSV
-    const headers = 'id,fullName,email,company,phone,status,date\n';
-    const rows = consultations.map(c => 
-      `${c.id},"${c.fullName}","${c.email}","${c.company}","${c.phone}",${c.status},"${c.createdAt.toISOString()}"`
-    ).join('\n');
-
-    return headers + rows;
+    return updated;
   }
 }
-
-export default new ConsultationService();

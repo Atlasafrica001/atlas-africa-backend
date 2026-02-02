@@ -1,71 +1,81 @@
 import { Request, Response } from 'express';
+import { AdminService } from '../services/admin.service';
 import { asyncHandler } from '../utils/asyncHandler';
-import { prisma } from '../lib/prisma';
+
+const adminService = new AdminService();
 
 export class AdminController {
   /**
-   * Get dashboard stats
+   * Get dashboard statistics
    */
-  getStats = asyncHandler(async (req: Request, res: Response) => {
-    // Get counts from database
-    const [waitlistCount, blogCount, publishedBlogCount] = await Promise.all([
-      prisma.waitlist.count(),
-      prisma.blogPost.count(),
-      prisma.blogPost.count({ where: { status: 'PUBLISHED' } }),
-    ]);
+  getDashboardStats = asyncHandler(async (req: Request, res: Response) => {
+    const stats = await adminService.getDashboardStats();
 
     res.status(200).json({
       success: true,
-      data: {
-        waitlist: waitlistCount,
-        blog: {
-          total: blogCount,
-          published: publishedBlogCount,
-          drafts: blogCount - publishedBlogCount
-        }
-      }
+      data: stats
     });
   });
 
   /**
-   * Upload file (placeholder - implement with your upload service)
+   * Get recent activity
    */
-  uploadFile = asyncHandler(async (req: Request, res: Response) => {
-    // TODO: Implement file upload logic
-    // This is a placeholder
-    res.status(501).json({
-      success: false,
-      error: 'File upload not implemented yet'
+  getRecentActivity = asyncHandler(async (req: Request, res: Response) => {
+    const limit = parseInt(req.query.limit as string) || 10;
+    const activity = await adminService.getRecentActivity(limit);
+
+    res.status(200).json({
+      success: true,
+      data: { activity }
     });
   });
 
   /**
-   * Get waitlist entries
+   * Get top posts
    */
-  getWaitlist = asyncHandler(async (req: Request, res: Response) => {
-    const entries = await prisma.waitlist.findMany({
-      orderBy: { createdAt: 'desc' }
-    });
+  getTopPosts = asyncHandler(async (req: Request, res: Response) => {
+    const limit = parseInt(req.query.limit as string) || 5;
+    const posts = await adminService.getTopPosts(limit);
 
     res.status(200).json({
       success: true,
-      data: { entries, total: entries.length }
+      data: { posts }
     });
   });
 
   /**
-   * Delete waitlist entry
+   * Get posts by status
    */
-  deleteWaitlistEntry = asyncHandler(async (req: Request, res: Response) => {
-    const { id } = req.params;
-
-    await prisma.waitlist.delete({
-      where: { id: parseInt(id) }
-    });
+  getPostsByStatus = asyncHandler(async (req: Request, res: Response) => {
+    const statusData = await adminService.getPostsByStatus();
 
     res.status(200).json({
       success: true,
-      data: { message: 'Entry deleted' }
+      data: { statusData }
+    });
+  });
+
+  /**
+   * Get category statistics
+   */
+  getCategoryStats = asyncHandler(async (req: Request, res: Response) => {
+    const categories = await adminService.getCategoryStats();
+
+    res.status(200).json({
+      success: true,
+      data: { categories }
+    });
+  });
+
+  /**
+   * Get posting trends
+   */
+  getPostingTrends = asyncHandler(async (req: Request, res: Response) => {
+    const trends = await adminService.getPostingTrends();
+
+    res.status(200).json({
+      success: true,
+      data: { trends }
     });
   });
 }

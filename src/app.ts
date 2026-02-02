@@ -9,6 +9,8 @@ import { requestIdMiddleware } from './middleware/requestId.middleware';
 import { apiLimiter } from './middleware/rateLimiter.middleware';
 import waitlistRoutes from './routes/waitlist.routes';
 import blogRoutes from './routes/blog.routes';
+import adminRoutes from './routes/admin.routes';
+
 
 const app: Application = express();
 
@@ -79,6 +81,7 @@ if (process.env.NODE_ENV === 'development') {
 
 app.use('/api/v1/waitlist', waitlistRoutes);
 app.use('/api/v1/blog', blogRoutes);
+app.use('/api/v1/admin', adminRoutes);
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // 7. RATE LIMITING
